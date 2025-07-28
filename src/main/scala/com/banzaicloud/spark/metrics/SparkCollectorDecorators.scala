@@ -1,10 +1,9 @@
 package com.banzaicloud.spark.metrics
 
 import java.util
-
 import com.banzaicloud.spark.metrics.CollectorDecorator.FamilyBuilder
 import com.banzaicloud.spark.metrics.PushTimestampDecorator.PushTimestampProvider
-import com.codahale.metrics.MetricRegistry
+import com.codahale.metrics.{Counter, Gauge, Histogram, Meter, MetricFilter, MetricRegistry, Timer}
 import io.prometheus.client.Collector.MetricFamilySamples
 import io.prometheus.client.Collector.MetricFamilySamples.Sample
 import io.prometheus.client.dropwizard.DropwizardExports
@@ -37,30 +36,31 @@ trait NameDecorator extends CollectorDecorator {
 }
 
 trait LabelsDecorator extends CollectorDecorator {
-    val extraLabels: Map[String, String]
+  val extraLabels: Map[String, String]
 
-    private val labelNames = extraLabels.keys.toList.asJava
-    private val labelValues = extraLabels.values.toList.asJava
+  private val labelNames = extraLabels.keys.toList.asJava
+  private val labelValues = extraLabels.values.toList.asJava
 
-    protected override def familyBuilder = {
-      super.familyBuilder.copy(
-        sampleBuilder = super.familyBuilder.sampleBuilder.copy(
-          sampleLabelNames = s => mergeLists(s.labelNames, labelNames),
-          sampleLabelValues = s => mergeLists(s.labelValues, labelValues)
-        )
+  protected override def familyBuilder = {
+    super.familyBuilder.copy(
+      sampleBuilder = super.familyBuilder.sampleBuilder.copy(
+        sampleLabelNames = s => mergeLists(s.labelNames, labelNames),
+        sampleLabelValues = s => mergeLists(s.labelValues, labelValues)
       )
-    }
+    )
+  }
 
-    private def mergeLists(list1: util.List[String], list2: util.List[String]): util.List[String] = {
-      val newList = new util.ArrayList[String](list1)
-      newList.addAll(list2)
-      newList
-    }
+  private def mergeLists(list1: util.List[String], list2: util.List[String]): util.List[String] = {
+    val newList = new util.ArrayList[String](list1)
+    newList.addAll(list2)
+    newList
+  }
 }
 
 object PushTimestampDecorator {
   case class PushTimestampProvider(getTimestamp: () => Long = System.currentTimeMillis) extends AnyVal
 }
+
 trait PushTimestampDecorator extends CollectorDecorator {
   val maybeTimestampProvider: Option[PushTimestampProvider]
 
@@ -80,28 +80,47 @@ trait PushTimestampDecorator extends CollectorDecorator {
 }
 
 trait ConstantHelpDecorator extends CollectorDecorator {
-  val constatntHelp: String
+  val constantHelp: String
 
   protected override val familyBuilder = super.familyBuilder.copy(
-      helpMessage = _ => constatntHelp
+    helpMessage = _ => constantHelp
   )
+}
+
+/**
+ * +  * Wraps DropwizardExports but applies a MetricFilter each time we collect.
+ * +  * This keeps it up-to-date as metrics are added/removed during runtime.
+ * + */
+private class FilteringDropwizardCollector(src: MetricRegistry, f: MetricFilter) extends io.prometheus.client.Collector {
+  override def collect(): util.List[MetricFamilySamples] = {
+    val snapshot = new MetricRegistry()
+
+    src.getGauges(f).asScala.foreach { case (n, m: Gauge[_]) => snapshot.register(n, m) }
+    src.getCounters(f).asScala.foreach { case (n, m: Counter) => snapshot.register(n, m) }
+    src.getHistograms(f).asScala.foreach { case (n, m: Histogram) => snapshot.register(n, m) }
+    src.getMeters(f).asScala.foreach { case (n, m: Meter) => snapshot.register(n, m) }
+    src.getTimers(f).asScala.foreach { case (n, m: Timer) => snapshot.register(n, m) }
+
+    new DropwizardExports(snapshot).collect()
+  }
 }
 
 class SparkDropwizardExports(private val registry: MetricRegistry,
                              override val metricsNameReplace: Option[NameDecorator.Replace],
                              override val extraLabels: Map[String, String],
-                             override val maybeTimestampProvider: Option[PushTimestampProvider])
-  extends CollectorDecorator(new DropwizardExports(registry))
+                             override val maybeTimestampProvider: Option[PushTimestampProvider],
+                             val metricFilter: MetricFilter = MetricFilter.ALL)
+  extends CollectorDecorator(new FilteringDropwizardCollector(registry, metricFilter))
     with NameDecorator
     with LabelsDecorator
     with PushTimestampDecorator
     with ConstantHelpDecorator {
-  override val constatntHelp: String = "Generated from Dropwizard metric import"
+  override val constantHelp: String = "Generated from Dropwizard metric import"
 }
 
 class SparkJmxExports(private val jmxCollector: JmxCollector,
-                 override val extraLabels: Map[String, String],
-                 override val maybeTimestampProvider: Option[PushTimestampProvider])
+                      override val extraLabels: Map[String, String],
+                      override val maybeTimestampProvider: Option[PushTimestampProvider])
   extends CollectorDecorator(jmxCollector)
     with LabelsDecorator
     with PushTimestampDecorator

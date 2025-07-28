@@ -40,16 +40,21 @@ import scala.util.matching.Regex
 object PrometheusSink {
   trait SinkConfig extends Serializable {
     def metricsNamespace: Option[String]
+
     def sparkAppId: Option[String]
+
     def sparkAppName: Option[String]
+
     def executorId: Option[String]
   }
 }
+
 abstract class PrometheusSink(property: Properties,
                               registry: MetricRegistry,
                               sinkConfig: PrometheusSink.SinkConfig,
                               pushGatewayBuilder: URL => PushGateway
-                              )  extends Logging {
+                             ) extends Logging {
+
   import sinkConfig._
 
   private val lbv = raw"(.+)\s*=\s*(.*)".r
@@ -74,7 +79,7 @@ abstract class PrometheusSink(property: Properties,
         s"executorId=$executorId")
 
       val role: String = (sparkAppId, executorId) match {
-        case (Some(_), Some("driver")) | (Some(_), Some("<driver>"))=> "driver"
+        case (Some(_), Some("driver")) | (Some(_), Some("<driver>")) => "driver"
         case (Some(_), Some(_)) => "executor"
         case _ => "unknown"
       }
@@ -95,7 +100,7 @@ abstract class PrometheusSink(property: Properties,
         customGroupKey(role, executorId, groupKey)
       }.getOrElse(defaultGroupKey(role, executorId, appName, instance, labelsMap))
 
-      pushGateway.pushAdd(pushRegistry, job, groupingKey.asJava)
+      pushGateway.push(pushRegistry, job, groupingKey.asJava)
     }
   }
 
@@ -156,7 +161,7 @@ abstract class PrometheusSink(property: Properties,
 
   val metricsNameReplacement: String =
     Option(property.getProperty(KEY_METRICS_NAME_REPLACEMENT))
-        .getOrElse("")
+      .getOrElse("")
 
   // validate pushgateway host:port
   Try(new URI(s"$pushGatewayAddressProtocol://$pushGatewayAddress")).get
@@ -198,7 +203,7 @@ abstract class PrometheusSink(property: Properties,
   logInfo(s"$KEY_JMX_COLLECTOR_CONFIG -> $jmxCollectorConfig")
 
   val metricsFilterProps: Map[String, String] = property.stringPropertyNames().asScala
-    .collect { case qualifiedKey @ KEY_RE_METRICS_FILTER(key) =>
+    .collect { case qualifiedKey@KEY_RE_METRICS_FILTER(key) =>
       val value = property.getProperty(qualifiedKey)
       logInfo(s"$qualifiedKey -> $value")
       key -> value
@@ -210,7 +215,7 @@ abstract class PrometheusSink(property: Properties,
 
   private val replace = metricsNameCaptureRegex.map(Replace(_, metricsNameReplacement))
 
-  lazy val sparkMetricExports = new SparkDropwizardExports(registry, replace, labelsMap, pushTimestamp)
+  lazy val sparkMetricExports = new SparkDropwizardExports(registry, replace, labelsMap, pushTimestamp, metricsFilter)
 
   lazy val jmxMetrics = new SparkJmxExports(new JmxCollector(new File(jmxCollectorConfig)), labelsMap, pushTimestamp)
 
@@ -278,10 +283,10 @@ abstract class PrometheusSink(property: Properties,
   }
 
   /**
-    * Default group key use instance name. So for every spark job instance it will create new metric group in the Push Gateway.
-    * This may lead to OOM errors.
-    * This method exists for backward compatibility.
-    */
+   * Default group key use instance name. So for every spark job instance it will create new metric group in the Push Gateway.
+   * This may lead to OOM errors.
+   * This method exists for backward compatibility.
+   */
   private def defaultGroupKey(role: String,
                               executorId: Option[String],
                               appName: String,
@@ -327,12 +332,12 @@ abstract class PrometheusSink(property: Properties,
 
     def maybeCallScalaMapConstructor = constructors.collectFirst {
       case c if c.getParameterCount == 1 &&
-        classOf[immutable.Map[_,_]].isAssignableFrom(c.getParameterTypes()(0)) => c.newInstance(props).asInstanceOf[MetricFilter]
+        classOf[immutable.Map[_, _]].isAssignableFrom(c.getParameterTypes()(0)) => c.newInstance(props).asInstanceOf[MetricFilter]
     }
 
     def maybeCallJavaMapConstructor = constructors.collectFirst {
       case c if c.getParameterCount == 1 &&
-        classOf[util.Map[_,_]].isAssignableFrom(c.getParameterTypes()(0)) => c.newInstance(props.asJava).asInstanceOf[MetricFilter]
+        classOf[util.Map[_, _]].isAssignableFrom(c.getParameterTypes()(0)) => c.newInstance(props.asJava).asInstanceOf[MetricFilter]
     }
 
     def maybeCallPropertiesConstructor = constructors.collectFirst {
