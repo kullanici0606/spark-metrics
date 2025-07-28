@@ -1,10 +1,11 @@
 package com.banzaicloud.spark.metrics.sink
 
+import com.banzaicloud.spark.metrics.filters.RegexMetricFilter
+
 import java.io.IOException
 import java.util
 import java.util.Properties
 import java.util.concurrent.CopyOnWriteArrayList
-
 import com.banzaicloud.spark.metrics.sink.PrometheusSink.SinkConfig
 import com.banzaicloud.spark.metrics.sink.PrometheusSinkSuite.{DefaultConstr, JavaMapConstr, PropertiesConstr, ScalaMapConstr}
 import com.codahale.metrics.{Metric, MetricFilter, MetricRegistry}
@@ -122,6 +123,7 @@ class PrometheusSinkSuite {
       (classOf[PropertiesConstr], _.asInstanceOf[PropertiesConstr].props.get("key")),
       (classOf[JavaMapConstr], _.asInstanceOf[JavaMapConstr].props.get("key")),
       (classOf[ScalaMapConstr], _.asInstanceOf[ScalaMapConstr].props("key")),
+      (classOf[RegexMetricFilter], _.asInstanceOf[RegexMetricFilter].props("regex"))
     )
 
     withSink({
