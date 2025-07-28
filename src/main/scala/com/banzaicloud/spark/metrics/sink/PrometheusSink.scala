@@ -100,7 +100,7 @@ abstract class PrometheusSink(property: Properties,
         customGroupKey(role, executorId, groupKey)
       }.getOrElse(defaultGroupKey(role, executorId, appName, instance, labelsMap))
 
-      pushGateway.push(pushRegistry, job, groupingKey.asJava)
+      pushGateway.pushAdd(pushRegistry, job, groupingKey.asJava)
     }
   }
 
@@ -209,7 +209,8 @@ abstract class PrometheusSink(property: Properties,
       key -> value
     }.toMap
 
-  val pushRegistry: CollectorRegistry = new DeduplicatedCollectorRegistry()
+  val baseRegistry = new CollectorRegistry(true)
+  val pushRegistry: CollectorRegistry = new DeduplicatedCollectorRegistry(baseRegistry)
 
   private val pushTimestamp = if (enableTimestamp) Some(PushTimestampProvider()) else None
 
