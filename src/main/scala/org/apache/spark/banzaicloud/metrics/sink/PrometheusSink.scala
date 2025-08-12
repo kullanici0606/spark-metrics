@@ -4,7 +4,7 @@ import java.net.URL
 import java.util.Properties
 
 import com.banzaicloud.spark.metrics.sink.PrometheusSink.SinkConfig
-import com.codahale.metrics.{MetricRegistry}
+import com.codahale.metrics.MetricRegistry
 import io.prometheus.client.exporter.PushGateway
 import org.apache.spark.banzaicloud.metrics.sink.PrometheusSink.SinkConfigProxy
 import org.apache.spark.internal.config
