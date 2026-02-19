@@ -1,6 +1,5 @@
-lazy val scala212 = "2.12.19"
-lazy val scala213 = "2.13.13"
-lazy val supportedScalaVersions = List(scala212, scala213)
+lazy val scala213 = "2.13.15"
+lazy val supportedScalaVersions = List(scala213)
 lazy val ioPrometheusVersion = "0.16.0"
 
 lazy val root = (project in file("."))
@@ -17,16 +16,16 @@ lazy val root = (project in file("."))
     ),
     scmInfo := Some(ScmInfo(url("https://github.com/banzaicloud/spark-metrics"), "git@github.com:banzaicloud/spark-metrics.git")),
     licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
-    scalaVersion := scala212,
+    scalaVersion := scala213,
     crossScalaVersions := supportedScalaVersions,
     libraryDependencies ++= Seq(
       "io.prometheus" % "simpleclient" % ioPrometheusVersion,
       "io.prometheus" % "simpleclient_dropwizard" % ioPrometheusVersion,
       "io.prometheus" % "simpleclient_common" % ioPrometheusVersion,
       "io.prometheus" % "simpleclient_pushgateway" % ioPrometheusVersion,
-      "io.dropwizard.metrics" % "metrics-core" % "4.2.21" % Provided,
+      "io.dropwizard.metrics" % "metrics-core" % "4.2.29" % Provided,
       "io.prometheus.jmx" % "collector" % "0.20.0",
-      "org.apache.spark" %% "spark-core" % "3.5.1" % Provided,
+      "org.apache.spark" %% "spark-core" % "4.0.1" % Provided,
       "com.github.sbt" % "junit-interface" % "0.13.3" % Test,
       // Spark shaded jetty is not resolved in scala 2.11
       // Described in https://issues.apache.org/jira/browse/SPARK-18162?focusedCommentId=15818123#comment-15818123
